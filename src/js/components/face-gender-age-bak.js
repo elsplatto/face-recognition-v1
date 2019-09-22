@@ -6,7 +6,7 @@ import { withStyles } from '@material-ui/styles';
 import PropTypes from 'prop-types';
 import CircularProgress from '@material-ui/core/CircularProgress';
 
-import { loadModels, getFullFaceDescription } from '../utilities/face';
+import { loadModels, getFullFaceDescription, getAgeAndGender } from '../utilities/face';
 
 
 const INIT_STATE = {
@@ -19,15 +19,20 @@ const styles = theme => ({
   root: {
     position: 'relative',
     flexGrow: 1,
-    paddingTop: theme.spacing(10)
+    marginTop: theme.spacing(10)
   },
   circProgress: {
     width: '44px',
     height: '44px'
   },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0
+  }
 });
 
-class FaceDetection extends React.Component {
+class FaceGenderAge extends React.Component {
   constructor(props) {
     super(props);
     
@@ -56,8 +61,10 @@ class FaceDetection extends React.Component {
       console.log('Component updated: ', this.props);
       console.log('Component updated uid: ', this.props.status.details.uid);
       this.retrieveImage();
+      
     }
   }
+  
 
   retrieveImage = async () => {
     const db = firebaseConfig.firestore();
@@ -71,8 +78,7 @@ class FaceDetection extends React.Component {
           })
         }
       }).then(async () =>  {
-        // console.log('imageURL', $this.state.imageURL)
-        
+        // console.log('imageURL', $this.state.imageURL);        
       })
 
     await loadModels();
@@ -87,6 +93,11 @@ class FaceDetection extends React.Component {
         detections: fullDesc.map(fd => fd.detection)
        });
     });
+
+    const img = document.getElementById('image');
+    console.log('Image:', img);
+
+    const results = await getAgeAndGender(img);
   };
 
   render() {
@@ -130,7 +141,8 @@ class FaceDetection extends React.Component {
 
       return (
         <Grid container className={classes.root} spacing={0}>
-          <img src={imageURL} alt="" id="image" crossorigin="anonymous" />
+          <img src={imageURL} alt="imageURL" id="image" crossOrigin="anonymous" />
+          <canvas id="overlay" className={classes.overlay} />
           {!!drawBox ? drawBox : null}
         </Grid>
       )
@@ -146,9 +158,9 @@ class FaceDetection extends React.Component {
   }
 }
 
-FaceDetection.propTypes = {
+FaceGenderAge.propTypes = {
   classes: PropTypes.object.isRequired,
 };
 
 
-export default withStyles(styles)(FaceDetection);
+export default withStyles(styles)(FaceGenderAge);

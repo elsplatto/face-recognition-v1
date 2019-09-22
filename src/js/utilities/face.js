@@ -28,13 +28,15 @@ function getFaceDetectorOptions() {
 
 export async function loadModels() {
   console.log('Load Model');
-  const MODEL_URL = process.env.PUBLIC_URL + '/models';
+  const MODEL_URL = process.env.PUBLIC_URL;
   // console.log('process.env',process.env);
   await faceapi.loadTinyFaceDetectorModel(MODEL_URL);
   await faceapi.loadFaceLandmarkTinyModel(MODEL_URL);
   await faceapi.loadFaceRecognitionModel(MODEL_URL);
   
 }
+
+
 
 export async function getFullFaceDescription(blob, inputSize = 512) {
   // tiny_face_detector options
@@ -59,7 +61,7 @@ export async function getFullFaceDescription(blob, inputSize = 512) {
 }
 
 export async function getAgeAndGender(imgObj) {
-  const MODEL_URL = process.env.PUBLIC_URL + '/models/';
+  const MODEL_URL = process.env.PUBLIC_URL;
   await getCurrentFaceDetectionNet().load(MODEL_URL)
   const options = getFaceDetectorOptions();
   console.log('options:', options);
