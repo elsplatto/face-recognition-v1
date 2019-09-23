@@ -12,3 +12,7 @@ node_modules/
 
 # Dist
 dist/
+
+#.env
+
+*.env
