@@ -1,10 +1,11 @@
 import React from 'react';
 import firebaseConfig from '../utilities/firebase-config';
 import Grid from '@material-ui/core/Grid';
-
+import Button from '@material-ui/core/Button';
 import { withStyles } from '@material-ui/styles';
 import PropTypes from 'prop-types';
 import CircularProgress from '@material-ui/core/CircularProgress';
+import LinearProgress from '@material-ui/core/LinearProgress';
 
 // import { loadModels, getFullFaceDescription, getAgeAndGender } from '../utilities/face';
 
@@ -29,7 +30,9 @@ let minFaceSize = 20
 const INIT_STATE = {
   imageURL: null,
   fullDesc: null,
-  detections: null
+  detections: null,
+  loading: true,
+  descriptors: null
 };
 
 const styles = theme => ({
@@ -41,6 +44,9 @@ const styles = theme => ({
   circProgress: {
     width: '44px',
     height: '44px'
+  },
+  linearProgress: {
+    width: 500
   },
   overlay: {
     position: 'absolute',
@@ -73,8 +79,13 @@ class FaceGenderAge extends React.Component {
     {
       console.log('Component updated: ', this.props);
       console.log('Component updated uid: ', this.props.status.details.uid);
+      console.log('this.state.descriptors: ', this.state.descriptors);
       this.retrieveImage();
       this.run();
+    }
+
+    if (!prevState.descriptors  && this.state.descriptors) {
+      console.log('this.state.descriptors: ', this.state.descriptors);
     }
   }
   
@@ -127,27 +138,51 @@ class FaceGenderAge extends React.Component {
   updateResults = async () => {
     if (!this.isFaceDetectionModelLoaded()) {
       return
-    }
-    
-    console.log('======================');
-    console.log('updateResults running');
+    }    
+    // console.log('======================');
+    // console.log('updateResults running');
 
     const inputImgEl = document.getElementById('image');
     const options = this.getFaceDetectorOptions();
     const canvas = document.getElementById('overlay');
 
-    console.log('options:', options);
+    console.log('options:', options);    
 
     const results = await faceapi.detectSingleFace(inputImgEl, options)
       // compute face landmarks to align faces for better accuracy
       .withFaceLandmarks()
-      .withAgeAndGender()
+      .withAgeAndGender().withFaceDescriptor()
+      // console.log('Results: ', results);
+      // console.log('uid: ', this.props.status.details.uid);
+
+    if (results) {
+      // const faceMatcher = new faceapi.FaceMatcher(results);
+      // console.log('faceMatcher: ', faceMatcher);
+      // const bestMatch = faceMatcher.findBestMatch(results.descriptor);
+      // console.log('Best Match: ', bestMatch);
+      // console.log('Best Match: ', bestMatch.label);
+      
+      // const labeledDescriptors = new faceapi.LabeledFaceDescriptors(
+      //   'jason',
+      //   [results.descriptor]
+      // )
+      // console.log('Descriptor: ', results.descriptor);
+      // console.log('Descriptor: ', Array.from(results.descriptor));
+      // this.setState({
+      //   descriptors: Array.from(results.descriptor)
+      // })
+      // console.log('labeledDescriptors: ', labeledDescriptors.descriptors);        
+    }    
+    
+    
+    
 
     
-    faceapi.matchDimensions(canvas, inputImgEl)
-
-    const resizedResults = faceapi.resizeResults(results, inputImgEl)
+    faceapi.matchDimensions(canvas, inputImgEl);
+    const resizedResults = faceapi.resizeResults(results, inputImgEl);
     faceapi.draw.drawDetections(canvas, resizedResults);
+    faceapi.draw.drawFaceLandmarks(canvas, resizedResults)
+    
 
     console.log('Resized results: ', resizedResults);
 
@@ -159,8 +194,20 @@ class FaceGenderAge extends React.Component {
           `${gender} (${faceapi.round(genderProbability)})`
         ],
         resizedResults.detection.box.bottomLeft
-      ).draw(canvas)
+      ).draw(canvas);
     // })
+
+    
+    // console.log('Descriptors: ', descriptors);
+
+    const descriptors = await faceapi.computeFaceDescriptor(inputImgEl);
+    console.log('==========================');
+    console.log('descriptors: ', descriptors);
+
+    this.setState({
+      loading: false,
+      descriptors: Array.from(descriptors)
+    })
   }
 
   changeFaceDetector = async(detector) => {    
@@ -170,17 +217,34 @@ class FaceGenderAge extends React.Component {
   }
 
   run = async () => {
-    console.log('======================');
-    console.log('RUN running');
+    // console.log('======================');
+    // console.log('RUN running');
     // load face detection and age and gender recognition models
     // and load face landmark model for face alignment
-    console.log('SSD_MOBILENETV1',SSD_MOBILENETV1)
+    // console.log('SSD_MOBILENETV1',SSD_MOBILENETV1)
     await this.changeFaceDetector(SSD_MOBILENETV1)
+    await faceapi.loadFaceRecognitionModel(MODEL_URL);
     await faceapi.loadFaceLandmarkModel(MODEL_URL)
     await faceapi.nets.ageGenderNet.load(MODEL_URL)
 
     // start processing image
-   this.updateResults()
+   this.updateResults();
+  }
+
+  storeIdentityDatapoints() {
+    const db = firebaseConfig.firestore();
+    const $this = this;
+    if (this.props.status !== undefined && this.props.status !== null) {
+      console.log('Ok - store this data.')
+      console.log('this.state.descriptors: ', $this.state.descriptors);
+      db.collection('descriptors').add({
+        descriptors: this.state.descriptors,
+        uid: this.props.status.details.uid,
+        imageURL: this.state.imageURL
+      }).then(function() {
+        $this.props.history.push('/');
+      });
+    }
   }
 
   render() {
@@ -221,10 +285,16 @@ class FaceGenderAge extends React.Component {
       }
 
       return (
-        <Grid container className={classes.root} spacing={0}>
-          <img crossOrigin="anonymous" src={imageURL} alt="imageURL" id="image" />
-          <canvas id="overlay" className={classes.overlay} />
-          {!!drawBox ? drawBox : null}
+        <Grid container className={classes.root}>
+          <Grid item xs={12}>
+            <img crossOrigin="anonymous" src={imageURL} alt="imageURL" id="image" />
+            <canvas id="overlay" className={classes.overlay} />
+            {!!drawBox ? drawBox : null}
+          </Grid>
+          
+          <Grid item xs={12}>
+            {this.state.loading ? <LinearProgress color="secondary" className={classes.linearProgress} /> : <Button variant="contained" onClick={this.storeIdentityDatapoints.bind(this)}>Store</Button> }            
+          </Grid>
         </Grid>
       )
     }
